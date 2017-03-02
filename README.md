@@ -28,7 +28,7 @@ less than 5. It will make it easier for the graders to submit a repo with a gh-p
 
 **Tool:** [RandomForest] Random forests or random decision forests are an ensemble learning method for classification, regression and other tasks, that operate by constructing a multitude of decision trees at training time and outputting the class that is the mode of the classes (classification) or mean prediction (regression) of the individual trees. Random decision forests correct for decision trees habit of overfitting to their training set.   
 
-## HTML report page (gh-pages) ##
+## HTML report page  ##
 
-Please open [this GitHub link](https://github.com/DeepeshKashyup/Practical-Machine-Learning
+Please open [this GitHub link] https://github.com/DeepeshKashyup/Practical-Machine-Learning
 ----------
