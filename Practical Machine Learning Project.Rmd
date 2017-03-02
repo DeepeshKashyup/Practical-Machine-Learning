@@ -1,0 +1,148 @@
+---
+title: "Practical Machine Learning - Course Project"
+author: "Deepesh"
+date: "March 1, 2017"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE, cache=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+set.seed(1)
+```
+
+## The Goal of Project 
+
+> In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. 
+
+The goal is 
+
+> to predict the manner in which they did the exercise.
+
+In the following, I describe the steps concerning the training of a predictive model.
+
+### Read the data
+
+First, the `.csv` file contain the training data is read into R. Here, unavailable values are set as `NA`.
+```{r read files}
+if(!file.exists("pml-training.csv")){
+url <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+f<- file.path("./pml-training.csv")
+download.file(url,f)}
+
+if(!file.exists("pml-testing.csv")){
+urlTest <-"https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+f<- file.path("./pml-testing.csv")
+download.file(urlTest,f)}
+
+rawdf <-read.csv("./pml-training.csv",na.strings = c("NA",""))
+testdata <- read.csv("./pml-testing.csv",na.strings = c("NA",""))
+```
+
+### Reduce the dataset
+
+In the next step, I check the proportion of missing values (`NA`s) in the columns.
+
+```{r check NAs}
+propNA <- colMeans(is.na(rawdf))
+table(propNA)
+```
+
+There are `r sum(as.logical(propNA))` columns in which almost all values (`r paste0(round(max(propNA) * 100, 2), "%")`) are missing. If a column contains a large number of `NA`s, it will not be of great use for training the model. Hence, these columns will be removed. Only the columns without any `NA`s will be kept.
+
+```{r remove NAs}
+idx <- !propNA
+
+rawReduced<-rawdf[idx]
+
+testReduced <- testdata[idx]
+```
+
+There are further unnecessary columns that can be removed. The column `X` contains the row numbers. The column `user_name` contains the name of the user. Of course, these variables cannot predictors for the type of exercise.
+
+Furthermore, the three columns containing time stamps (`raw_timestamp_part_1`, `raw_timestamp_part_2`, and `cvtd_timestamp`) will not be used.
+
+The factors `new_window` and `num_window` are not related to sensor data. They will be removed too.
+
+```{r remove non-sensory columns}
+idx <- grep("^X$|user_name|timestamp|window", names(rawdf))
+
+rawdataReduced2 <- rawReduced[-idx]
+testDataReduced2 <- testReduced[-idx]
+```
+
+
+### Preparing the data for training
+
+Now, the dataset contains one outcome column (`classe`) and `r ncol(rawReduced) - 1L` feature columns. The function `createDataPartition` of the `caret` package is used to split the data into a training and a cross-validation data set. Here, 70% of the data goes into the training set.
+
+
+```{r data partition, message = FALSE}
+library(caret)
+```
+```{r create partition}
+intrain <- createDataPartition(rawdataReduced2$classe,p=0.7,list=F)
+```
+
+
+The index `inTrain` is used to split the data.
+
+```{r seprate datasets}
+training <- rawdataReduced2[intrain,]
+# The number of rows in training dataset
+nrow(training)
+crossval <- rawdataReduced2[-intrain,]
+# The number of rows in cross validation dataset
+nrow(crossval)
+```
+### Train a model
+
+I used the *random-forest* technique to generate a predictive model. In sum, 10 models were trained. I played around with the parameters passed to `trControl` and specified different models with bootstrapping (`method = "boot"`) and cross-validation (`method = "cv"`).
+
+It took more than one day to train all models. Afterwards I tested their performance on the cross-validation dataset. It turned out that all models showed a good performance (because their accuracy was above 99%) though their training times were quite different.
+
+Due to the similar performance, I will present the model with the shortest training time.
+```{r load randomForest package, message=FALSE}
+library(randomForest)
+```
+
+```{r train model}
+trControl <- trainControl(method = "cv", number = 2)
+modFit <- train(classe ~ ., data = training, method = "rf", prox = TRUE, trControl = trControl)
+```
+
+### Evaluate the model (out-of-sample error)
+
+First, the final model is used to predict the outcome in the cross-validation dataset.
+
+```{r predict}
+pred <- predict(modFit, newdata = crossval)
+```
+
+Second, the function `confusionMatrix` is used to calculate the accuracy of the prediction.
+
+```{r accuracy}
+coMa <- confusionMatrix(pred, reference = crossval$classe)
+acc <- coMa$overall["Accuracy"]
+acc
+```
+
+The accuracy of the prediction is `r paste0(round(acc * 100, 2), "%")`. Hence, the *out-of-sample error* is `r paste0(round(100 - acc * 100, 2), "%")`.
+
+### Variable importance
+
+The five most important variables in the model and their relative importance values are:
+
+```{r varImp}
+vi <- varImp(modFit)$importance
+vi[head(order(unlist(vi), decreasing = TRUE), 5L), , drop = FALSE]
+```
+
+### Predicting Test cases 
+
+Now lets apply the Model to the `testDataReduced2` dataset. 
+```{r predict test Cases}
+pred <- predict(modFit, newdata = testDataReduced2)
+pred
+```
